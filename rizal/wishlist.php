@@ -1,9 +1,8 @@
-<?php include 'koneksi.php'; ?>
 <!DOCTYPE html>
 <html lang="id">
 <head>
   <meta charset="UTF-8" />
-  <title>Wishlist</title>
+  <title>Filter Opsi Toggle</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" />
   <style>
     body {
@@ -205,25 +204,25 @@
 .empty-message p {
   margin: 8px 0;
 }
-</style>
+  </style>
 </head>
 <body>
+
 <!-- Header -->
 <header class="navbar">
   <div class="judul-navbar"><strong>WISHLIST</strong></div>
   <div class="subnav">
     <ul>
-      <li><a href="index.php">Toko</a></li>
-      <li><a href="keranjang.php">Keranjang</a></li>
+      <li><a href="index.php">toko</a></li>
+      <li><a href="keranjang.php">keranjang</a></li>
     </ul>
   </div>
 </header>
+
 <!-- Search -->
 <div class="search-container">
-  <input type="text" id="searchInput" placeholder="Cari di wishlist..." onkeyup="filterWishlist()">
-
-
-
+  <input type="text" placeholder="favorite list" />
+  
   <div class="filter-wrapper">
     <button id="toggle-button">Opsi ▼</button>
     <div id="filter-panel" class="hidden">
@@ -244,66 +243,104 @@
   </div>
 </div>
 
-
-
 <hr class="garis-bawah" />
+
 <!-- PRODUK -->
-<div class="product-container" id="product-list">
-<?php
-$favorit = $koneksi->query("SELECT produk.* FROM produk JOIN favorit ON produk.id = favorit.produk_id");
-if ($favorit->num_rows === 0): ?>
-  <div class="empty-message">
-    <p><strong>Wishlist-mu kosong.</strong></p>
-    <p>Isi wishlist dengan menelusuri toko dan menggunakan tombol “hati”.</p>
-  </div>
-<?php else:
-  while ($row = $favorit->fetch_assoc()):
-?>
-  <div class="product-card" data-judul="<?= strtolower($row['judul']) ?>">
+<div class="product-container" id="product-list"></div>
+
+<!-- SCRIPT -->
+<script>
+  const toggleBtn = document.getElementById('toggle-button');
+  const filterPanel = document.getElementById('filter-panel');
+  const productList = document.getElementById('product-list');
+
+let products = [];
+
+fetch('get_wishlist.php')
+  .then(res => res.json())
+  .then(data => {
+    products = data;
+    renderProducts();
+  })
+  .catch(err => {
+    console.error("Gagal memuat wishlist:", err);
+  });
+
+
+function renderProducts() {
+  const kategori = document.querySelector('input[name="lihat"]:checked').value;
+  const sort = document.querySelector('input[name="diskon"]:checked').value;
+
+  let filtered = [...products];
+
+  if (kategori !== "all") {
+    filtered = filtered.filter(p => p.kategori === kategori);
+  }
+
+  filtered.sort((a, b) => sort === "asc" ? a.harga - b.harga : b.harga - a.harga);
+
+  productList.innerHTML = '';
+
+  if (filtered.length === 0) {
+    productList.innerHTML = `
+      <div class="empty-message">
+        <p><strong>Wishlist-mu kosong.</strong></p>
+        <p>Isi wishlist dengan menelusuri toko dan menggunakan tombol “hati”.</p>
+        <p>Pelajari lebih lanjut tentang Wishlist Start</p>
+      </div>
+    `;
+  } else {
+    filtered.forEach(p => {
+// Ganti p.name dengan p.judul
+productList.innerHTML += `
+  <div class="product-card">
     <div class="product-info">
-      <h2><?= $row['judul'] ?></h2>
-      <?php if ($row['gambar']): ?>
-        <img src="gambar/<?= $row['gambar'] ?>" alt="<?= $row['judul'] ?>" class="produk-gambar">
-      <?php endif; ?>
-      <p><strong>Deskripsi:</strong> <?= $row['deskripsi'] ?></p>
-      <p><strong>Kategori:</strong> <?= $row['kategori'] ?></p>
-      <span style="font-size: 18px; font-weight: bold;">Rp <?= number_format($row['harga'], 0, ',', '.') ?></span>
+      <h2>${p.judul}</h2>
+      ${p.gambar ? `<img src="${p.gambar}" alt="${p.judul}" class="produk-gambar">` : ''}
+      <p><strong>Deskripsi:</strong> ${p.deskripsi}</p>
+      <p><strong>Kategori:</strong> ${p.kategori}</p>
+      <span style="font-size: 18px; font-weight: bold;">Rp ${p.harga.toLocaleString('id-ID')}</span>
       <br />
-      <a href="tambah_keranjang.php?id=<?= $row['id'] ?>"><button>Masuk Keranjang</button></a>
-      <a href="hapus_favorit.php?id=<?= $row['id'] ?>"><button style="background:red; color:white;">Hapus</button></a>
+      <button onclick="tambahKeKeranjang(${p.id})">Masuk Keranjang</button>
     </div>
   </div>
-<?php endwhile; endif; ?>
-</div>
-
-<script>
-function filterWishlist() {
-  const keyword = document.getElementById('searchInput').value.toLowerCase();
-  document.querySelectorAll('.product-card').forEach(card => {
-    const judul = card.getAttribute('data-judul');
-    card.style.display = judul.includes(keyword) ? '' : 'none';
+`;
+    });
+  }
+}
+function tambahKeKeranjang(id) {
+  fetch('tambah_keranjang.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      produk_id: id,
+      jumlah: 1
+    })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      alert("Produk ditambahkan ke keranjang!");
+    } else {
+      alert("Gagal menambahkan ke keranjang.");
+    }
   });
 }
 
 
 
-
   // Event toggle filter panel
-  const toggleBtn = document.getElementById('toggle-button');
-const filterPanel = document.getElementById('filter-panel');
   toggleBtn.addEventListener('click', () => {
     filterPanel.classList.toggle('show');
   });
 
-   // Event render ulang saat filter berubah
+  // Event render ulang saat filter berubah
   document.querySelectorAll('input[name="lihat"], input[name="diskon"]').forEach(input => {
     input.addEventListener('change', renderProducts);
   });
 
   // Render awal
   renderProducts();
-
 </script>
-
 </body>
 </html>
